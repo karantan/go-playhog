@@ -24,14 +24,48 @@ func GetBrowser(headless bool) (playwright.Browser, error) {
 		return nil, fmt.Errorf("could not start Playwright: %w", err)
 	}
 	// defer pw.Stop()
-
 	// Launch a new browser instance in slow motion so that posthog can do its thing
 	option := playwright.BrowserTypeLaunchOptions{
 		Channel:  playwright.String("chrome"),
 		Headless: playwright.Bool(headless),
 		SlowMo:   playwright.Float(2000),
+		Devtools: playwright.Bool(false),
+	}
+	return pw.Chromium.Launch(option)
+}
+
+func GetBrowserCustomResolver(headless bool, domain, serverIP string) (playwright.Browser, error) {
+	// Use local chrome
+	runOption := &playwright.RunOptions{
+		SkipInstallBrowsers: true,
+	}
+	err := playwright.Install(runOption)
+	if err != nil {
+		return nil, fmt.Errorf("could not install playwright dependencies: %v", err)
 	}
 
+	// Initialize Playwright
+	pw, err := playwright.Run()
+	if err != nil {
+		return nil, fmt.Errorf("could not start Playwright: %w", err)
+	}
+	// defer pw.Stop()
+	// Add a custom resolver for the domain. This is useful when the domain is not
+	// reachable from the internet.
+	// See https://peter.sh/experiments/chromium-command-line-switches/ for all flags
+	resolverFlag := fmt.Sprintf("--host-resolver-rules=MAP %s %s", domain, serverIP)
+	fmt.Printf("launching browser with a custom resolver: %s", resolverFlag)
+	// Launch a new browser instance in slow motion so that posthog can do its thing
+	option := playwright.BrowserTypeLaunchOptions{
+		Channel:  playwright.String("chrome"),
+		Headless: playwright.Bool(headless),
+		SlowMo:   playwright.Float(2000),
+		Devtools: playwright.Bool(false),
+		Args: []string{
+			resolverFlag,
+			"--no-sandbox",
+		},
+	}
 	return pw.Chromium.Launch(option)
 }
 
